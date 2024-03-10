@@ -3,21 +3,91 @@
 #include <cstdlib>
 #include <fstream>
 #include <chrono>
+#include <nlohmann/json.hpp>
+#include <unistd.h>
 // #include <std>
+
+using json = nlohmann::json;
 
 namespace lqr
 {
+  void LQR_Euler::loadNeuralNetworkConfig(const std::string &configFile)
+  {
+    std::ifstream file(configFile);
+
+    std::string weightsPath;
+    if (file.is_open())
+    {
+      json jsonData;
+      file >> jsonData;
+
+      numLayers = jsonData["num_layers"];
+      isQuaternion = jsonData["isQuaternion"];
+      weightsPath = jsonData["weights_paths"];
+      if (isQuaternion)
+        numOutNeurons = jsonData["num_output_neurons"];
+      file.close();
+
+      W.reserve(numLayers);
+      B.reserve(numLayers);
+
+      for (int i = 0; i < numLayers; i++)
+      {
+        W.push_back(load_csv<Eigen::MatrixXd>(ros::package::getPath("lqr_controller") + "/" + weightsPath + "/W" + std::to_string(i + 1) + ".csv"));
+        B.push_back(load_csv<Eigen::MatrixXd>(ros::package::getPath("lqr_controller") + "/" + weightsPath + "/B" + std::to_string(i + 1) + ".csv"));
+      }
+
+      std::cout << "Neural Net configuration acquired." << std::endl;
+      std::cout << "Weights Path: " << weightsPath << std::endl;
+      std::cout << "Number of Layers: " << numLayers << std::endl;
+      std::cout << "Is Quaternion: " << isQuaternion << std::endl;
+      if (isQuaternion)
+        std::cout << "Number of output neurons: " << numOutNeurons << std::endl;
+      std::cout << "\n\n"
+                << std::endl;
+      sleep(2);
+    }
+    else
+    {
+      std::cerr << "Error opening the Neural Net configuration file." << std::endl;
+      std::exit(0);
+    }
+  }
+
+  void LQR_Euler::loadTestConfig(const std::string &configFile)
+  {
+    std::ifstream file(configFile);
+
+    std::string weightsPath;
+    if (file.is_open())
+    {
+      json jsonData;
+      file >> jsonData;
+
+      testDuration = jsonData["testDuration"];
+      logInterval = jsonData["logInterval"];
+      auto referenceList = jsonData["referenceList"];
+
+      for (const auto &element : referenceList)
+      {
+        Eigen::Vector4d vector4d;
+        for (size_t i = 0; i < element.size(); ++i)
+          vector4d(i) = element[i];
+        staticRefNN.push_back(vector4d);
+      }
+    }
+    else
+    {
+      std::cerr << "Error opening the Test configuration file." << std::endl;
+      std::exit(0);
+    }
+  }
 
   LQR_Euler::LQR_Euler(ros::NodeHandle &nodeHandle)
       : nodeHandle_(nodeHandle)
   {
-    W.reserve(2);
-    B.reserve(2);
-
-    W.push_back(load_csv<Eigen::MatrixXd>(ros::package::getPath("lqr_controller") + "/Weights/PreTraining/Quaternion/W1.csv"));
-    W.push_back(load_csv<Eigen::MatrixXd>(ros::package::getPath("lqr_controller") + "/Weights/PreTraining/Quaternion/W2.csv"));
-    B.push_back(load_csv<Eigen::MatrixXd>(ros::package::getPath("lqr_controller") + "/Weights/PreTraining/Quaternion/B1.csv"));
-    B.push_back(load_csv<Eigen::MatrixXd>(ros::package::getPath("lqr_controller") + "/Weights/PreTraining/Quaternion/B2.csv"));
+    loadNeuralNetworkConfig(ros::package::getPath("lqr_controller") + "/Config/NeuralNet.json");
+    loadTestConfig(ros::package::getPath("lqr_controller") + "/Config/TestReference.json");
 
     quadraticCost_.loadConfigFile(ros::package::getPath("lqr_controller") + "/lqrCostEuler.info", "termLQR");
     Q_ = quadraticCost_.getStateWeight();
@@ -60,18 +130,18 @@ namespace lqr
     if (!takeoff)
     {
       // Set new state for testing
-      if (counter == -1 || (ros::Time::now().toSec() - init_time_ > duration_test && counter < (staticRefNN.size() - 1)))
+      if (counter == -1 || (ros::Time::now().toSec() - init_time_ > testDuration && counter < (staticRefNN.size() - 1)))
       {
         counter += 1;
         setStaticReference(xref_, uref_, staticRefNN[counter]);
         init_time_ = ros::Time::now().toSec();
       }
 
-      if (ros::Time::now().toSec() - last_log_time > log_interval)
+      if (ros::Time::now().toSec() - last_log_time > logInterval)
       {
         last_log_time = ros::Time::now().toSec();
 
-        std::cout << "Remaing time for next state:" << (int)(duration_test - (ros::Time::now().toSec() - init_time_)) << "\n\n";
+        std::cout << "Remaing time for next state:" << (int)(testDuration - (ros::Time::now().toSec() - init_time_)) << "\n\n";
 
         std::cout << "Current State: [";
         for (int i = 0; i < 3; i++)
@@ -752,8 +822,15 @@ namespace lqr
     x_eq << 0, 0, -1.0, 0, 0, 1.57, 0, 0, 0;
     control_eq << 0, 0, 0, 0.605;
 
-    // this->output_nn = neuralNetworkModel(x) - neuralNetworkModel(x_eq) + control_eq;
-    this->output_nn = neuralNetworkModel(stateToQuaternion(x)) - neuralNetworkModel(stateToQuaternion(x_eq)) + control_eq;
+    if (isQuaternion)
+    {
+      Eigen::VectorXd xQ = stateToQuaternion(x);
+      Eigen::VectorXd x_eqQ = stateToQuaternion(x_eq);
+      Eigen::VectorXd control_eqQ = actionToQuaternion(control_eq);
+      this->output_nn = quaternionToAction(neuralNetworkModel(xQ) - neuralNetworkModel(x_eqQ) + control_eqQ);
+    }
+    else
+      this->output_nn = neuralNetworkModel(x) - neuralNetworkModel(x_eq) + control_eq;
   }
 
   Eigen::VectorXd LQR_Euler::stateToQuaternion(const state_vector_t x)
@@ -772,6 +849,34 @@ namespace lqr
     q[10] = x[7];
     q[11] = x[8];
     return q;
+  }
+
+  Eigen::VectorXd LQR_Euler::actionToQuaternion(const control_vector_t u)
+  {
+    Eigen::VectorXd q(8);
+    if (numOutNeurons == 1)
+      return u;
+    q[0] = 0.5;
+    q[1] = u[0];
+    q[2] = u[1];
+    q[3] = u[2];
+    q[4] = u[3];
+    q[5] = 0;
+    q[6] = 0;
+    q[7] = 0;
+    return q;
+  }
+
+  Eigen::VectorXd LQR_Euler::quaternionToAction(const Eigen::VectorXd q)
+  {
+    control_vector_t u;
+    if (numOutNeurons == 1)
+      return q;
+    u[0] = q[1];
+    u[1] = q[2];
+    u[2] = q[3];
+    u[3] = q[4];
+    return u;
   }
 
   void LQR_Euler::eulerToQuat(double *rpy_in, double *quat_in)

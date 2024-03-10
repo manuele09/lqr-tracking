@@ -1,0 +1,6 @@
+{
+    "weights_paths": "Weights/PreTraining/Quaternion/2",
+    "num_layers": 2,
+    "num_output_neurons": 2,
+    "isQuaternion": true
+}

@@ -77,12 +77,12 @@ int main(int argc, char **argv)
 
 		double duration = end_timer - start_timer;
 
-		if (duration < 15.0 && lqr.takeoff == true)
+		if (duration < 10.0 && lqr.takeoff == true)
 		{
 			double end_timer = ros::Time::now().toSec();
 			double duration = end_timer - start_timer; // duration change of 0.01 each iteration
 
-			std::cout << "Remaining Time Lqr Control: " << (15 - duration) << std::endl;
+			std::cout << "Remaining Time Lqr Control: " << (10 - duration) << std::endl;
 			lqr.setOutput(lqr.getTrajectoryControl() - lqr.getGain() * lqr.getError());
 			bodyrate_msg.thrust = lqr.getMotorCmd(); // Take off (//Position control   getMotoCmd invece di getMotoCmdNN perchè ci serve normalizzare)
 			// std::cout << "Lqr Take off" << std::endl;

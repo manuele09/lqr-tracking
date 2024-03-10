@@ -50,9 +50,13 @@ namespace lqr
     double getTimerNN();                        // IMPLEMENTED BY US
     double getTimerLQR();                       // IMPLEMENTED BY USù
 
+    void loadNeuralNetworkConfig(const std::string &configFile);
+    void loadTestConfig(const std::string &configFile);
     void neuralNetwork(const state_vector_t x); // IMPLEMENTD BY US
     Eigen::VectorXd neuralNetworkModel(const Eigen::VectorXd x);
     Eigen::VectorXd stateToQuaternion(const state_vector_t x);
+    Eigen::VectorXd actionToQuaternion(const control_vector_t u);
+    Eigen::VectorXd quaternionToAction(const Eigen::VectorXd q);
 
     void lyapunov_net(const state_vector_t x);
     void copy_Eigen_to_double(double *target, Eigen::VectorXd &source, int length);
@@ -60,6 +64,9 @@ namespace lqr
 
     std::vector<Eigen::MatrixXd> W;
     std::vector<Eigen::MatrixXd> B;
+    int numLayers;
+    bool isQuaternion;
+    int numOutNeurons;
 
     template <typename M>
     M load_csv(const std::string &path)
@@ -111,15 +118,10 @@ namespace lqr
     bool firstFlight = true;
     bool firstFlight_NN = true;
 
-    std::vector<Eigen::Vector4d> staticRefNN{// Reference states to test
-                                             Eigen::Vector4d(0.0, 0.0, 1.0, 0.0),
-                                             Eigen::Vector4d(1.0, 1.0, 1.0, 0.0),
-                                             Eigen::Vector4d(2.0, 2.0, 1.0, 0.0),
-                                             Eigen::Vector4d(3.0, 3.0, 1.0, 0.0),
-                                             Eigen::Vector4d(4.0, 4.0, 1.0, 0.0)};
-    int duration_test = 10;    // Duration time for each of the states
+    std::vector<Eigen::Vector4d> staticRefNN;
+    int testDuration;    // Duration time for each of the states
     int counter;               // Index relative to the current state under test
-    double log_interval = 1.0; // For logging every x seconds
+    double logInterval; // For logging every x seconds
     double last_log_time;
 
     // LQR MAX DIST
