@@ -1,6 +1,8 @@
 {
-    "weights_paths": "Weights/PreTraining/Quaternion/2",
+    "_comment": "In the weights_path the Weights must be saved as these: W1.csv, B1.csv, W2.csv, B2.csv, ...",
+    "weights_paths": "Weights/PreTraining/Linear/9x7x4", 
     "num_layers": 2,
-    "num_output_neurons": 2,
-    "isQuaternion": true
+    "isQuaternion": false,
+    "_comment2": "num_output_neurons contains the number of quaternions used for the output (1 or 2)",
+    "num_output_neurons": 1
 }
