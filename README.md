@@ -26,3 +26,30 @@ Contains information for testing the controller behavior on a set of reference s
     "referenceList": "List of reference vectors to test"
 }
 ```
+
+# Compilation
+In the workspace directory, run the following commands:
+```bash
+catkin clean -y  # (if necessary)
+catkin build
+```
+
+# Execution
+
+In one terminal, navigate to the PX4-autopilot directory and run the following command to start PX4 SITL in Gazebo:
+```bash
+make px4_sitl gazebo
+```
+
+In another terminal, navigate to the workspace and run the following command to launch MAVROS:
+```bash
+source devel/setup.bash
+roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
+```
+
+In another terminal, navigate to the workspace and run the following command to launch the controller:
+```bash
+source devel/setup.bash
+roslaunch lqr_controller lqr_euler.launch
+```
+
