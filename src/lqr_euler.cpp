@@ -86,8 +86,8 @@ namespace lqr
   LQR_Euler::LQR_Euler(ros::NodeHandle &nodeHandle)
       : nodeHandle_(nodeHandle)
   {
-    loadNeuralNetworkConfig(ros::package::getPath("lqr_controller") + "/Config/NeuralNet.json");
-    loadTestConfig(ros::package::getPath("lqr_controller") + "/Config/TestReference.json");
+    loadNeuralNetworkConfig(ros::package::getPath("lqr_controller") + "/config/NeuralNet.json");
+    loadTestConfig(ros::package::getPath("lqr_controller") + "/config/TestReference.json");
 
     quadraticCost_.loadConfigFile(ros::package::getPath("lqr_controller") + "/lqrCostEuler.info", "termLQR");
     Q_ = quadraticCost_.getStateWeight();
